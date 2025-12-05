@@ -1,0 +1,19 @@
+{
+  "name": "my-worlds-pokemon-backend",
+  "version": "1.0.0",
+  "description": "Backend do desafio - blog auto-gerado",
+  "main": "src/index.js",
+  "type": "module",
+ "scripts": {
+  "dev": "node src/index.js",
+  "start": "NODE_ENV=production node src/index.js",
+  "db:init": "node src/db/init.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.19.0",
+    "node-cron": "^4.2.1",
+    "pg": "^8.16.3"
+  }
+}

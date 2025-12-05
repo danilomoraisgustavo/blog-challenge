@@ -1,0 +1,38 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_REGION: sa-east-1
+    BACKEND_IMAGE_NAME: myworlds-backend
+    FRONTEND_IMAGE_NAME: myworlds-frontend
+
+phases:
+  pre_build:
+    commands:
+      - echo "Fase pre_build..."
+      - aws --version
+      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - echo "Account: $AWS_ACCOUNT_ID"
+      - BACKEND_REPO_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_IMAGE_NAME
+      - FRONTEND_REPO_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_IMAGE_NAME
+      - echo "Backend repo: $BACKEND_REPO_URI"
+      - echo "Frontend repo: $FRONTEND_REPO_URI"
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+  build:
+    commands:
+      - echo "Build das imagens..."
+      - docker build -t $BACKEND_REPO_URI:latest ./backend
+      - docker build -t $FRONTEND_REPO_URI:latest ./frontend
+
+  post_build:
+    commands:
+      - echo "Push das imagens..."
+      - docker push $BACKEND_REPO_URI:latest
+      - docker push $FRONTEND_REPO_URI:latest
+      - echo "Imagens publicadas com sucesso."
+artifacts:
+  files:
+    - infra/**
+    - docs/**
+    - README.md

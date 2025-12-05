@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: myworlds-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+      POSTGRES_DB: ${PGDATABASE}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - myworlds-net
+
+  backend:
+    image: ${BACKEND_IMAGE}
+    container_name: myworlds-backend
+    restart: always
+    depends_on:
+      - db
+    env_file:
+      - ./backend.prod.env
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+    ports:
+      - "4000:4000"
+    networks:
+      - myworlds-net
+
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    container_name: myworlds-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - myworlds-net
+
+networks:
+  myworlds-net:
+
+volumes:
+  db_data:

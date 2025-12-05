@@ -1,0 +1,76 @@
+# Node / JS
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Vite / React
+dist/
+.vite/
+*.local
+
+# Logs
+logs/
+*.log
+*.log.*
+log.txt
+debug.log
+
+# Env files
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+
+backend/.env
+backend/*.env
+frontend/.env
+frontend/*.env
+infra/*.env
+
+# Docker
+docker-compose.override.yml
+docker-data/
+*.pid
+*.sock
+
+# AWS / credenciais
+*.pem
+*.key
+*.crt
+aws_credentials
+.aws/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build backend
+backend/dist/
+backend/build/
+
+# Build frontend
+frontend/dist/
+frontend/build/
+
+# Coverage
+coverage/
+*.lcov
+
+# Caches
+.cache/
+.cache-loader/
+eslintcache
+.parcel-cache/
+
+# Uploads / temporários
+uploads/
+tmp/
+temp/
