@@ -25,7 +25,7 @@ phases:
       - echo BUILD_BACKEND
       - docker build -t $BACKEND_REPO_URI:$IMAGE_TAG -f backend/Dockerfile backend
       - echo BUILD_FRONTEND
-      - docker build -t $FRONTEND_REPO_URI:$IMAGE_TAG -f frontend/Dockerfile frontend
+      - docker build -t $FRONTEND_REPO_URI:$IMAGE_TAG -f frontend/Dockerfile .
 
   post_build:
     commands:
