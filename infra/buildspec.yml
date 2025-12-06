@@ -3,36 +3,50 @@ version: 0.2
 env:
   variables:
     AWS_REGION: sa-east-1
-    BACKEND_IMAGE_NAME: myworlds-backend
-    FRONTEND_IMAGE_NAME: myworlds-frontend
-
+    BACKEND_REPO_NAME: blog-backend
+    FRONTEND_REPO_NAME: blog-frontend
+  parameter-store:
+    # Se quiser pegar da Parameter Store em vez de hardcode:
+    # HF_API_KEY: "/myworlds/HF_API_KEY"
+    # UNSPLASH_ACCESS_KEY: "/myworlds/UNSPLASH_ACCESS_KEY"
+    # etc.
 phases:
   pre_build:
     commands:
-      - echo "Fase pre_build..."
-      - aws --version
+      - echo "Login no ECR..."
       - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - echo "Account: $AWS_ACCOUNT_ID"
-      - BACKEND_REPO_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_IMAGE_NAME
-      - FRONTEND_REPO_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_IMAGE_NAME
-      - echo "Backend repo: $BACKEND_REPO_URI"
-      - echo "Frontend repo: $FRONTEND_REPO_URI"
+      - export AWS_ACCOUNT_ID
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      - echo "Definindo tags de imagem..."
+      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
+      - export IMAGE_TAG
+
+      - BACKEND_REPO_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO_NAME
+      - FRONTEND_REPO_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPO_NAME
+      - export BACKEND_REPO_URI FRONTEND_REPO_URI
 
   build:
     commands:
-      - echo "Build das imagens..."
-      - docker build -t $BACKEND_REPO_URI:latest ./backend
-      - docker build -t $FRONTEND_REPO_URI:latest ./frontend
+      - echo "Build BACKEND..."
+      - docker build -t $BACKEND_REPO_URI:$IMAGE_TAG -f backend/Dockerfile ./backend
+
+      - echo "Build FRONTEND..."
+      # Usa contexto na raiz porque o Dockerfile do frontend copia infra/nginx.conf e frontend/
+      - docker build -t $FRONTEND_REPO_URI:$IMAGE_TAG -f frontend/Dockerfile .
 
   post_build:
     commands:
-      - echo "Push das imagens..."
-      - docker push $BACKEND_REPO_URI:latest
-      - docker push $FRONTEND_REPO_URI:latest
-      - echo "Imagens publicadas com sucesso."
+      - echo "Push BACKEND..."
+      - docker push $BACKEND_REPO_URI:$IMAGE_TAG
+
+      - echo "Push FRONTEND..."
+      - docker push $FRONTEND_REPO_URI:$IMAGE_TAG
+
+      - echo "Criando arquivo com as imagens geradas..."
+      - printf '{"backend_image":"%s","frontend_image":"%s"}' "$BACKEND_REPO_URI:$IMAGE_TAG" "$FRONTEND_REPO_URI:$IMAGE_TAG" > imageDetail.json
+
 artifacts:
   files:
-    - infra/**
-    - docs/**
-    - README.md
+    - infra/docker-compose.yml
+    - imageDetail.json

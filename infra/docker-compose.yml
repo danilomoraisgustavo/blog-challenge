@@ -2,47 +2,53 @@ version: "3.9"
 
 services:
   db:
-    image: postgres:16-alpine
-    container_name: myworlds-db
-    restart: always
+    image: postgres:16
+    container_name: blog-db
     environment:
       POSTGRES_USER: ${PGUSER}
       POSTGRES_PASSWORD: ${PGPASSWORD}
       POSTGRES_DB: ${PGDATABASE}
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     networks:
-      - myworlds-net
+      - blog-net
+    restart: unless-stopped
 
   backend:
-    image: ${BACKEND_IMAGE}
-    container_name: myworlds-backend
-    restart: always
-    depends_on:
-      - db
-    env_file:
-      - ./backend.prod.env
+    image: 211125427196.dkr.ecr.sa-east-1.amazonaws.com/blog-backend:latest
+    container_name: blog-backend
     environment:
       PGHOST: db
-      PGPORT: 5432
+      PGPORT: ${PGPORT}
+      PGUSER: ${PGUSER}
+      PGPASSWORD: ${PGPASSWORD}
+      PGDATABASE: ${PGDATABASE}
+      HF_API_KEY: ${HF_API_KEY}
+      HF_MODEL: ${HF_MODEL}
+      UNSPLASH_ACCESS_KEY: ${UNSPLASH_ACCESS_KEY}
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${PORT}
+    depends_on:
+      - db
     ports:
       - "4000:4000"
     networks:
-      - myworlds-net
+      - blog-net
+    restart: unless-stopped
 
   frontend:
-    image: ${FRONTEND_IMAGE}
-    container_name: myworlds-frontend
-    restart: always
+    image: 211125427196.dkr.ecr.sa-east-1.amazonaws.com/blog-frontend:latest
+    container_name: blog-frontend
     depends_on:
       - backend
     ports:
       - "80:80"
     networks:
-      - myworlds-net
+      - blog-net
+    restart: unless-stopped
 
 networks:
-  myworlds-net:
+  blog-net:
 
 volumes:
-  db_data:
+  pgdata:
