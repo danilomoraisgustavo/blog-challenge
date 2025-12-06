@@ -12,10 +12,14 @@ phases:
       - echo PRE_BUILD_START
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - echo ACCOUNT_ID=$ACCOUNT_ID
+
+      - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
       - BACKEND_REPO_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO_NAME
       - FRONTEND_REPO_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPO_NAME
       - IMAGE_TAG=$(date +%Y%m%d%H%M%S)
+
       - echo BACKEND_REPO_URI=$BACKEND_REPO_URI
       - echo FRONTEND_REPO_URI=$FRONTEND_REPO_URI
       - echo IMAGE_TAG=$IMAGE_TAG
@@ -24,18 +28,29 @@ phases:
     commands:
       - echo BUILD_BACKEND
       - docker build -t $BACKEND_REPO_URI:$IMAGE_TAG -f backend/Dockerfile backend
+      # Tag adicional como :latest para facilitar o deploy na EC2
+      - docker tag $BACKEND_REPO_URI:$IMAGE_TAG $BACKEND_REPO_URI:latest
+
       - echo BUILD_FRONTEND
       - docker build -t $FRONTEND_REPO_URI:$IMAGE_TAG -f frontend/Dockerfile .
+      # Tag adicional como :latest para facilitar o deploy na EC2
+      - docker tag $FRONTEND_REPO_URI:$IMAGE_TAG $FRONTEND_REPO_URI:latest
 
   post_build:
     commands:
       - echo POST_BUILD_PUSH
+
+      # Push imagens com TAG de timestamp (histórico)
       - docker push $BACKEND_REPO_URI:$IMAGE_TAG
       - docker push $FRONTEND_REPO_URI:$IMAGE_TAG
+
+      # Push imagens com TAG :latest (usadas pela EC2)
+      - docker push $BACKEND_REPO_URI:latest
+      - docker push $FRONTEND_REPO_URI:latest
+
       - echo GENERATE_imageDetail
       - printf '{"backend_image":"%s","frontend_image":"%s"}' "$BACKEND_REPO_URI:$IMAGE_TAG" "$FRONTEND_REPO_URI:$IMAGE_TAG" > imageDetail.json
 
 artifacts:
   files:
-    - infra/docker-compose.yml
     - imageDetail.json

@@ -1,0 +1,83 @@
+name: CI/CD - Blog Challenge
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: sa-east-1
+  CODEBUILD_PROJECT_NAME: blog-challenge-codebuild # ajuste para o nome REAL do seu projeto CodeBuild
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Configura credenciais AWS (usadas para chamar o CodeBuild)
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Dispara o CodeBuild
+      - name: Start CodeBuild
+        id: start_build
+        run: |
+          BUILD_ID=$(aws codebuild start-build \
+            --project-name "$CODEBUILD_PROJECT_NAME" \
+            --query 'build.id' \
+            --output text)
+
+          echo "BUILD_ID=$BUILD_ID"
+          echo "BUILD_ID=$BUILD_ID" >> $GITHUB_OUTPUT
+
+      # Aguarda o CodeBuild finalizar (polling simples)
+      - name: Wait for CodeBuild to finish
+        run: |
+          BUILD_ID="${{ steps.start_build.outputs.BUILD_ID }}"
+          echo "Waiting for build: $BUILD_ID"
+
+          while true; do
+            STATUS=$(aws codebuild batch-get-builds \
+              --ids "$BUILD_ID" \
+              --query 'builds[0].buildStatus' \
+              --output text)
+
+            echo "Current build status: $STATUS"
+
+            if [ "$STATUS" = "SUCCEEDED" ]; then
+              echo "Build succeeded."
+              break
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "FAULT" ] || [ "$STATUS" = "STOPPED" ] || [ "$STATUS" = "TIMED_OUT" ]; then
+              echo "Build failed with status: $STATUS"
+              exit 1
+            else
+              echo "Build still in progress... waiting 15s"
+              sleep 15
+            fi
+          done
+
+      # Faz deploy na EC2 via SSH chamando o script deploy.sh
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }} # exemplo: 56.124.99.8
+          EC2_USER: ${{ secrets.EC2_USER }} # exemplo: ubuntu
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }} # chave privada (PEM) como secret
+        run: |
+          echo "Creating SSH key file..."
+          echo "$EC2_SSH_KEY" > ssh_key.pem
+          chmod 600 ssh_key.pem
+
+          echo "Deploying to EC2..."
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "$EC2_USER@$EC2_HOST" << 'EOF'
+            cd ~/blog-challenge
+            ./infra/scripts/deploy.sh
+          EOF
+
+          echo "Deployment done."

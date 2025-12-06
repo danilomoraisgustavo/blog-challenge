@@ -1,15 +1,25 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-echo "Starting deployment..."
+echo "[deploy] Starting deployment..."
 
-cd ~/blog-challenge/infra
+# Garante que estamos na pasta infra (onde está o docker-compose.yml)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}/.."
 
-echo "Pulling updated images..."
+echo "[deploy] Working directory: $(pwd)"
+echo "[deploy] Using docker-compose.yml from here."
+
+echo "[deploy] Stopping existing containers..."
+docker-compose down || echo "[deploy] No containers to stop (continuing)."
+
+echo "[deploy] Pulling latest images..."
 docker-compose pull
 
-echo "Recreating containers..."
+echo "[deploy] Starting new containers..."
 docker-compose up -d
 
-echo "Deployment completed."
-docker ps
+echo "[deploy] Deployment completed."
+echo
+echo "[deploy] Current containers:"
+docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"

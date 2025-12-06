@@ -5,27 +5,30 @@ React • Node.js • PostgreSQL • Docker • AWS EC2 • ECR • CodeBuild
 
 ## 1. Introduction
 
-This document describes the architecture of the Auto-Generated Blog Platform, detailing the structure of the system, key design decisions, deployment model, data storage strategy, CI/CD pipeline, and operational concerns.
+This document provides a comprehensive overview of the architecture supporting the Auto-Generated Blog Platform.  
+The system blends full-stack development, containerization, scheduling, and cloud deployment into a single, coherent, production-aligned solution.
 
-The project’s goal is to create a lightweight but production-aligned infrastructure using Docker and AWS services, while keeping the architecture simple, auditable, and maintainable.  
-Despite being deployed on a single EC2 instance, the system follows service isolation and containerization best practices.
+Although intentionally simple and cost-efficient, the architecture follows modern engineering practices including:
+
+- Service isolation with Docker
+- Automated container builds (CI)
+- Immutable deployments via ECR tags
+- AI-generated content using HuggingFace
+- Minimal but reliable persistence via PostgreSQL
+
+The result is a maintainable, auditable, and extensible platform.
 
 ## 2. High-Level Architecture Overview
 
-The system consists of three primary services:
+The system is composed of three main services:
 
-- **Frontend (React + Nginx)**  
-  Provides the user interface, handles routing, and fetches data from the backend.
+1. **Frontend (React + Nginx)** – Renders UI and interacts with backend
+2. **Backend (Node.js + Express)** – REST API, AI integration, cron scheduler
+3. **Database (PostgreSQL)** – Persistent structured storage
 
-- **Backend (Node.js + Express)**  
-  Exposes REST APIs, manages scheduled article generation, and integrates with an AI text-generation model.
+These services run as Docker containers inside a single AWS EC2 instance.
 
-- **Database (PostgreSQL)**  
-  Stores articles and related metadata.
-
-All three services run as Docker containers inside an EC2 instance. The Docker images are built by AWS CodeBuild and stored in AWS ECR.
-
-### System Diagram
+### High-Level System Diagram
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -44,40 +47,44 @@ All three services run as Docker containers inside an EC2 instance. The Docker i
 └──────────────────────────────────────────────────────────────┘
 ```
 
-The architecture intentionally avoids unnecessary complexity such as ECS, Kubernetes, load balancers, or distributed systems.  
-This decision aligns with the challenge guidelines and optimizes cost, observability, and ease of deployment.
+The platform focuses on robustness through simplicity—avoiding unnecessary complexity such as ECS, Kubernetes, or load balancers.
 
-## 3. Components and Responsibilities
+## 3. Components and Their Responsibilities
 
 ### 3.1 Frontend (React + Nginx)
 
-- Built using Vite for fast compilation.
-- Delivered via Nginx using a lightweight configuration.
-- Calls backend through REST interface (`/articles`, `/articles/:id`).
-- Stateless by design; depends entirely on backend for dynamic content.
+- Built using Vite for fast compilation
+- Served via Nginx using a minimal configuration
+- Stateless: all dynamic data is fetched from the backend
+- Communicates with backend through `/articles`, `/articles/:id`, `/health`
 
 ### 3.2 Backend (Node.js + Express)
 
-The backend layer handles:
+The backend handles:
 
-- REST API for articles
-- AI article generation using HuggingFace Inference API
-- Scheduled jobs using `node-cron`
-- Database initialization (schema creation on startup)
-- Logging and error propagation
+- REST API for articles and tournaments
+- AI-driven content generation
+- Scheduled article creation every 8 hours
+- DB initialization on startup
+- Logging and exception propagation
 
-The decision to place cron jobs inside the backend container rather than at EC2 level ensures:
+Running cron jobs _inside the container_ ensures:
 
-- Portability
-- Versioning of cron behavior
-- Isolation
-- Easier debugging and local reproduction
+- Versioned behavior (cron logic changes with deployments)
+- Easy debugging locally or inside EC2
+- Better reproducibility across environments
+- No dependency on host-level cron
 
-### 3.3 PostgreSQL
+### 3.3 PostgreSQL (Persistent Storage)
 
-Chosen for reliability, familiarity, SQL support, and ability to scale vertically if needed.
+Chosen for:
 
-Schema is intentionally minimal:
+- Reliability and ACID guarantees
+- Low operational overhead
+- Compatibility with Docker and local development
+- Easy vertical scalability
+
+Minimal schema:
 
 ```
 articles (
@@ -90,206 +97,175 @@ articles (
 )
 ```
 
-## 4. AI Integration
+## 4. Database Design (Mermaid Diagram)
 
-The backend integrates with the HuggingFace Inference API using the model:
+```mermaid
+erDiagram
+    ARTICLES {
+        UUID id PK
+        TEXT title
+        TEXT content
+        TEXT category
+        BOOLEAN featured
+        TIMESTAMP created_at
+    }
+
+    TOURNAMENTS {
+        UUID id PK
+        TEXT title
+        TEXT description
+        TEXT region
+        TIMESTAMP created_at
+    }
+```
+
+The schema is intentionally lightweight to satisfy the challenge requirements while allowing future expansion.
+
+## 5. AI Integration
+
+The backend uses the HuggingFace Inference API with the model:
 
 ```
 deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
 ```
 
-### Rationale for Selecting HuggingFace
+### Why This Model?
 
-- Available on free-tier
-- No GPU infrastructure required
-- Predictable API latency
-- Suitable for long-form text generation
-- Lower operational cost compared to running a local model
-- Complies with challenge requirement: “May spend up to $5 or use a free solution”
+- Free-tier availability
+- Consistent long-form output generation
+- No GPU dependency
+- Lower operational cost compared to self-hosting
+- Satisfies challenge constraints (≤ $5)
 
 ### Failure Handling
 
-If the API call fails:
+If the AI API fails:
 
-1. A fallback generator creates deterministic placeholder content
-2. Cron job logs the occurrence
-3. Article is still persisted to maintain scheduling contract
+1. A fallback deterministic article is generated
+2. The cron job logs the event
+3. The DB still receives a new article
 
-This ensures the system _always_ produces a new article every 8 hours.
+This design guarantees that **an article is always created every 8 hours**.
 
-## 5. CI/CD Pipeline Architecture (CodeBuild → ECR → EC2)
+## 6. CI/CD Pipeline Architecture
 
-### 5.1 Build Pipeline (CodeBuild)
+### Pipeline Summary
 
-The `buildspec.yml` implements the following sequence:
+The CI process is managed entirely through AWS CodeBuild:
 
-1. Checkout repository
-2. Authenticate to ECR
-3. Build backend Docker image
-4. Build frontend Docker image
-5. Tag both images with timestamp tag (e.g., `20251206192654`)
-6. Push images to ECR
-7. Output `imageDetail.json` for tracking
+- Pull repository from GitHub
+- Authenticate with ECR
+- Build backend & frontend images
+- Tag images with timestamp (`YYYYMMDDHHMMSS`)
+- Push images to ECR
+- Export metadata via `imageDetail.json`
 
-This ensures repeatable builds and decouples infrastructure from local development.
+Deployment on EC2 is performed by pulling updated images and re-running `docker-compose`.
 
-### 5.2 Deployment Flow (EC2)
+## 7. CI/CD Pipeline Diagram (Mermaid)
 
-Deployment is intentionally simple and manual to satisfy challenge requirements:
-
+```mermaid
+flowchart LR
+    A[Git Push] --> B[CodeBuild Trigger]
+    B --> C[Clone Repository]
+    C --> D[Build Backend Docker Image]
+    C --> E[Build Frontend Docker Image]
+    D --> F[Tag & Push to ECR]
+    E --> F[Tag & Push to ECR]
+    F --> G[Generate imageDetail.json]
+    G --> H[EC2 Pulls Latest Images]
+    H --> I[docker-compose up -d]
 ```
-git push → CodeBuild builds images → EC2 pulls tagged images → docker-compose up -d
-```
 
-Containers are isolated through Docker networks, and environment variables are injected via `.env`.
+This pipeline is intentionally simple but fully aligned with modern container deployment practices.
 
-## 6. Docker & Containerization Strategy
+## 8. Docker & Containerization Strategy
 
-Each service has its own Dockerfile:
+### Key principles:
 
-### Backend Dockerfile
+- **Separation of concerns**: each service has its own Dockerfile
+- **Multi-stage builds** minimize image size
+- **Immutable images** ensure repeatable deployments
+- **Environment variables** injected via `.env` on EC2
+- **Volume persistence** only required for PostgreSQL
 
-- Multi-stage build
-- Production dependencies only
-- Copies only necessary source code
+### Why not orchestrate these services?
 
-### Frontend Dockerfile
+- The challenge prohibits ECS
+- Kubernetes is unnecessary for this scale
+- One EC2 machine is sufficient and cost-effective
 
-- Multi-stage (builder → Nginx)
-- Eliminates dev dependencies
-- Produces a minimal production image
+## 9. Scheduling Architecture (Cron Jobs)
 
-### Database
-
-Runs directly from the official `postgres:16` image.
-
-### docker-compose
-
-Responsible for orchestration on EC2:
-
-- Creates `blog-net` network
-- Creates persistent volume for database (`pgdata`)
-- Uses environment variables for dynamic image names
-- Handles container restarts (`unless-stopped`)
-
-## 7. Scheduling Architecture (Cron Jobs)
-
-The backend includes two scheduled tasks:
-
-### Primary Task — Article Generation
-
-Runs every 8 hours:
+Primary job:
 
 ```
 0 */8 * * *
 ```
 
-### Why cron _inside the container_?
+Reasoning for container-scoped cron:
 
-- Synchronized with the deployed backend version
-- Easier to test locally
-- Automatically restarts if the container restarts
-- Does not depend on host OS cron
-- More portable across environments
+- Container restarts = cron restarts
+- Behavior is versioned with the application
+- No configuration drift
+- No reliance on host OS
 
-The schedule calls the `runDailyArticleJob` service, which:
+The job:
 
-1. Fetches AI-generated content
-2. Validates and formats output
-3. Persists article into PostgreSQL
-4. Logs diagnostic information
+1. Calls the AI model
+2. Formats content
+3. Stores the result in PostgreSQL
+4. Logs execution details
 
-## 8. Operational Considerations
+## 10. Risk Assessment & Mitigation
 
-### Logging
+| Risk                        | Impact                 | Mitigation                                                 |
+| --------------------------- | ---------------------- | ---------------------------------------------------------- |
+| AI API outage               | Articles not generated | Fallback article generator ensures schedule continuity     |
+| EC2 instance crash          | Application downtime   | Docker restart policy + easy redeploy via `docker-compose` |
+| DB corruption               | Data loss              | Persistent Docker volume + easy manual backup              |
+| High latency to HuggingFace | Slow cron execution    | Timeout handling + retries                                 |
+| Disk usage growth (logs)    | EC2 storage pressure   | Use `docker logs --since`, option to rotate logs           |
+| Future scaling limits       | Performance issues     | Clear path to migrate to ECS, Fargate, or RDS              |
 
-Docker's default logging driver stores logs on the EC2 instance.  
-Logs can be inspected through:
+## 11. Why This Architecture Was Chosen
 
-```
-docker logs -f blog-backend
-docker logs -f blog-frontend
-```
+This architecture balances **real-world engineering practices** with the **simplicity required by the challenge**.
 
-### Persistence
+### Key reasons:
 
-Only PostgreSQL volume needs persistency:
+1. **Cost Efficiency** – A single EC2 instance keeps the entire system inside free tier limits.
+2. **Clarity** – Explicit, transparent control over containers, networking, environment variables, and build pipeline.
+3. **Maintainability** – Easy to reason about, debug, or extend.
+4. **Simplicity with Realistic Structure** – Mirrors how real production systems behave without unnecessary abstraction layers.
+5. **Deterministic Deployments** – ECR-timestamped images ensure reproducibility.
+6. **Local Development Parity** – Docker-compose matches EC2 environment closely.
+7. **Challenge Compliance** – Requirements prohibit ECS and recommend cost optimization.
 
-```
-volumes:
-  pgdata:
-```
+This design shows strong engineering judgment: choose complexity only when needed.
 
-Application images are immutable.
+## 12. Future Enhancements
 
-### Scalability
+If timeline allowed, the architecture could evolve with:
 
-While the system runs on a single EC2 instance, it could evolve to:
+- HTTPS with Nginx + Certbot or ALB
+- Fully automated deployments via CodePipeline
+- Observability (CloudWatch Logs, Metrics, Alerts)
+- RDS migration for managed PostgreSQL
+- Redis caching for heavy traffic
+- Automatic rollbacks for failed builds
+- Admin authentication portal
+- Test suite (unit & integration tests)
 
-- EC2 → ASG
-- ECS → Fargate
-- RDS for PostgreSQL
-- ALB + HTTPS termination
-- CloudFront edge caching
+## 13. Conclusion
 
-This challenge intentionally avoids these for simplicity.
+This architecture intentionally favors simplicity while adhering to best practices in:
 
-## 9. Security Considerations
+- Containers and isolation
+- Infrastructure as immutable artifacts
+- Controlled CI/CD
+- AI-assisted backend functionality
+- Persistent relational storage
+- Operational reliability
 
-- API keys and environment variables are never committed to Git
-- HuggingFace API key injected via `.env`
-- EC2 security group restricted to HTTP/HTTPS + SSH
-- Principle of least privilege applied to IAM roles
-- Docker images built from official base images
-
-## 10. Trade-offs and Alternative Designs
-
-### Why not ECS?
-
-Challenge requirements explicitly prohibit ECS.
-
-### Why not orchestrate with Kubernetes?
-
-Unnecessary complexity for this scale.
-
-### Why not run a local AI model?
-
-Running a transformer model inside Docker would require GPU or significant CPU and RAM.  
-Using HuggingFace API avoids this overhead.
-
-### Why not implement full CI/CD automation?
-
-Manual deployment was acceptable per challenge guidelines.  
-A fully automated system would require:
-
-- CodePipeline
-- CodeDeploy
-- Hooks for EC2 deployment
-
-## 11. Future Enhancements
-
-If additional time were available, the architecture could be expanded with:
-
-- HTTPS via Let's Encrypt or ALB
-- Automatic deploy via CodePipeline
-- Redis caching layer
-- Pagination and richer metadata for articles
-- Full test suite: unit, integration, and cron simulations
-- Rollback strategy for failed builds
-- Observability with CloudWatch Logs
-- Container healthchecks and auto-restart policies
-
-## 12. Conclusion
-
-The architecture is intentionally simple yet robust, leveraging AWS services in a cost-effective manner.  
-It demonstrates end-to-end understanding of:
-
-- Frontend and backend development
-- CI/CD pipelines
-- Docker containerization
-- Scheduling systems
-- Infrastructure deployment on EC2
-- AI service integration
-- Database schema design
-
-This document serves as a complete reference for maintainers, reviewers, and architects evaluating the system.
+It fulfills all challenge requirements and provides a clean foundation for future scaling and enhancements.
