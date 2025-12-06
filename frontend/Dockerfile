@@ -4,6 +4,7 @@
 FROM node:20-alpine AS build
 
 WORKDIR /app
+
 COPY package*.json ./
 RUN npm ci
 
@@ -14,7 +15,7 @@ ENV VITE_API_URL=/api
 
 RUN npm run build
 
-# Etapa 2: nginx para servir estático + proxy
+# Etapa 2: servir com Nginx
 FROM nginx:1.27-alpine AS prod
 
 # Remove config default

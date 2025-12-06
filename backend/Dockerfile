@@ -1,16 +1,13 @@
 # backend/Dockerfile
-FROM node:20-alpine AS base
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copia package.json e instala dependências (produção)
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --only=production
 
-# Copia código fonte
 COPY . .
 
-ENV NODE_ENV=production
 EXPOSE 4000
 
-CMD ["node", "src/index.js"]
+CMD ["npm", "start"]
