@@ -1,11 +1,11 @@
 # Auto-Generated Blog Platform
 
-Full-Stack • AI Integration • Docker • AWS EC2 • CodeBuild • ECR
+Full-Stack • AI Integration • Docker • AWS EC2 • ECR • CodeBuild • GitHub Actions
 
 A production-oriented blog platform that autonomously generates and publishes articles using AI.  
-The system was designed to demonstrate full-stack engineering, DevOps practices, cloud deployment, container orchestration, and AI-assisted content creation.
+The system was created as part of a technical challenge and demonstrates full-stack engineering, DevOps practices, cloud deployment, CI/CD automation, container orchestration, and AI-assisted content creation.
 
-This challenge was completed using React, Node.js, PostgreSQL, Docker, AWS EC2, AWS CodeBuild, AWS ECR, and HuggingFace Inference API.
+The platform uses React, Node.js, PostgreSQL, Docker, AWS EC2, AWS CodeBuild, AWS ECR, HuggingFace Inference API — and now **GitHub Actions for automated deployment**.
 
 ---
 
@@ -19,120 +19,120 @@ https://github.com/danilomoraisgustavo/blog-challenge
 
 ---
 
-# 2. Video Summary (for the final submission)
+# 2. Video Summary (for challenge submission)
 
-The video (30–120 seconds) will cover:
+The video (30–120 seconds) should cover:
 
-- A brief personal introduction
-- Overview of the system architecture
-- Demonstration of automatic article generation
-- Explanation of technical decisions (Docker, EC2, ECR, CodeBuild, AI model)
-- What could be improved with more time
-
-This summary is included here for reference and will appear alongside the final video link.
+- Brief personal introduction
+- High-level system architecture
+- Demonstration of automatic AI article generation
+- Technical reasoning behind Docker, EC2, ECR, CodeBuild, cron jobs, and the AI model
+- What would be improved with additional time
 
 ---
 
 # 3. Project Overview
 
-The platform automatically generates new AI-based articles **every 8 hours** and publishes them to a fully responsive frontend.
+The platform automatically generates new AI-based articles **every 8 hours** and publishes them to a modern, fully responsive interface.
 
-The stack includes:
+Core stack:
 
-- **React + Nginx** (frontend)
-- **Node.js + Express + Cron** (backend)
-- **PostgreSQL** (persistent storage)
-- **HuggingFace Inference API** (text generation)
-- **AWS EC2** hosting using **Docker Compose**
-- **AWS CodeBuild + ECR** automated image builds
+- **Frontend:** React + Vite + Nginx
+- **Backend:** Node.js + Express + Cron
+- **Database:** PostgreSQL
+- **AI Model:** HuggingFace Inference API
+- **Infrastructure:** Docker Compose on EC2
+- **Image Pipeline:** AWS CodeBuild → AWS ECR
+- **Deployment Automation:** GitHub Actions + SSH deploy script
 
-The architecture emphasizes clarity, maintainability, and alignment with production best practices—while intentionally remaining simple, as required by the challenge.
+The design favors simplicity, robustness, and cloud best practices.
 
 ---
 
 # 4. Features
 
-### Application Features
+## Application Features
 
-- Automatic generation of a new article every 8 hours
-- AI-generated long-form content (HuggingFace model)
-- Article listing page and full article view
+- Automatic article creation every 8 hours
+- AI-powered long-form content generation
 - Fully responsive UI
+- Article listing and detail view
 - Health-check endpoint
-- Strict backend error logging and fallback mode
-- Minimal but extensible database schema
+- Fallback article generator (in case AI API fails)
+- Minimal but extensible schema
 
-### Infrastructure Features
+## Infrastructure Features
 
-- Frontend, backend, and DB fully containerized
-- Multi-stage Docker builds
-- Automated pipelines with AWS CodeBuild
-- Images stored in AWS ECR with timestamp tags
-- EC2 instance running docker-compose
-- Environment-driven configuration
-- Lightweight, low-cost architecture
+- Fully containerized (frontend, backend, DB)
+- Multi-stage Docker builds for production images
+- Automated image builds via AWS CodeBuild
+- Images stored in AWS ECR (`:latest` tag)
+- Auto-deployment via GitHub Actions
+- EC2 host uses `docker-compose` orchestration
+- Zero-downtime container refresh with `up -d`
 
 ---
 
 # 5. Architecture Overview
 
-```
-                   ┌──────────────────────────┐
-                   │      Frontend (Nginx)     │
-                   │  React / Vite build       │
-                   └──────────────┬────────────┘
-                                  │
-                           REST API Calls
-                                  │
-                   ┌──────────────▼────────────┐
-                   │      Backend (Node.js)     │
-                   │ Express, Cron, AI Requests │
-                   └──────────────┬────────────┘
-                                  │
-                         PostgreSQL Queries
-                                  │
-                   ┌──────────────▼────────────┐
-                   │        PostgreSQL DB       │
-                   └────────────────────────────┘
-```
+               ┌──────────────────────────┐
+               │      Frontend (Nginx)     │
+               │  React / Vite build       │
+               └──────────────┬────────────┘
+                              │
+                       REST API Calls
+                              │
+               ┌──────────────▼────────────┐
+               │      Backend (Node.js)     │
+               │ Express, Cron, AI Requests │
+               └──────────────┬────────────┘
+                              │
+                     PostgreSQL Queries
+                              │
+               ┌──────────────▼────────────┐
+               │        PostgreSQL DB       │
+               └────────────────────────────┘
 
-All components run inside Docker containers on a single EC2 instance.
+Everything runs inside Docker on a single EC2 instance.
 
 ---
 
 # 6. Repository Structure
 
-```
 backend/
-  src/
-    routes/
-    services/
-    db/
-    index.js
-  Dockerfile
+src/
+routes/
+services/
+db/
+index.js
+Dockerfile
 
 frontend/
-  src/
-  Dockerfile
+src/
+Dockerfile
 
 infra/
-  buildspec.yml
-  docker-compose.yml
-  scripts/
-    deploy.sh
-    init-ec2.sh
+buildspec.yml
+docker-compose.yml
+scripts/
+deploy.sh
+init-ec2.sh
+
+.github/
+workflows/
+deploy.yml
 
 docs/
-  ARCHITECTURE.md
+ARCHITECTURE.md
 
 README.md
-```
+
+yaml
+Copiar código
 
 ---
 
 # 7. Backend API
-
-### Routes
 
 | Method | Route           | Description           |
 | ------ | --------------- | --------------------- |
@@ -144,38 +144,41 @@ README.md
 
 # 8. Cron Job (Article Generation)
 
-The backend uses **node-cron** to schedule AI article creation every 8 hours:
+The backend uses **node-cron** to generate new AI articles every 8 hours:
 
-```
-0 */8 * * *
-```
+0 _/8 _ \* \*
+
+yaml
+Copiar código
 
 Each execution:
 
-1. Calls HuggingFace to generate a title/content
-2. Formats the response
-3. Persists the article in PostgreSQL
-4. Logs creation details
+1. Calls HuggingFace for title + content
+2. Formats and validates the response
+3. Stores article in PostgreSQL
+4. Logs job execution
 
-If the AI API fails, a fallback generator ensures the schedule is **never** interrupted.
+If the AI API fails, fallback mode produces consistent placeholder content.
 
 ---
 
 # 9. AI Integration
 
-Model used:
+Using:
 
-```
-deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
-```
+Model: deepseek-ai/DeepSeek-R1-Distill-Qwen-32B
+Provider: HuggingFace Inference API
+
+yaml
+Copiar código
 
 Reasons:
 
-- Free-tier availability
-- Good for long-form coherent text
+- Free-tier friendly
+- Good coherence for long-form text
 - Fast inference
-- No GPU required
-- Meets the “max $5 API usage” requirement
+- Avoids GPU requirements
+- Meets challenge constraints
 
 ---
 
@@ -201,127 +204,147 @@ Reasons:
 - Docker
 - Docker Compose
 
-### Start all services
+### Start everything
 
 ```bash
 docker-compose up --build
-```
+Access
+Frontend → http://localhost
 
-### Services
+Backend → http://localhost:4000
 
-- Frontend: http://localhost
-- Backend: http://localhost:4000
-
-### Stop all services
-
-```bash
+Stop
+bash
+Copiar código
 docker-compose down
-```
-
----
-
-# 12. Deployment on AWS EC2
-
-### 1. Access EC2
-
-```bash
+12. Deployment on AWS EC2
+SSH into instance
+bash
+Copiar código
 ssh ubuntu@56.124.99.8
-```
-
-### 2. Pull updated images
-
-```bash
+Pull latest images
+bash
+Copiar código
 cd ~/blog-challenge/infra
 docker-compose pull
-```
-
-### 3. Relaunch environment
-
-```bash
+Restart environment
+bash
+Copiar código
 docker-compose up -d
 docker ps
-```
-
-### 4. Validate health
-
-```
+Health-check
+arduino
+Copiar código
 http://56.124.99.8/health
-```
+13. Automated CI/CD (GitHub Actions → CodeBuild → EC2)
+The automated pipeline performs:
 
----
+Step 1 — GitHub Push
+You push code to main.
 
-# 13. CI/CD (CodeBuild → ECR → EC2)
+Step 2 — CodeBuild
+Builds backend image (blog-backend:latest)
 
-The pipeline performs:
+Builds frontend image (blog-frontend:latest)
 
-1. Clone repository
-2. Build backend Docker image
-3. Build frontend Docker image
-4. Tag with timestamp (`YYYYMMDDHHMMSS`)
-5. Push images to ECR
-6. Generate `imageDetail.json`
+Pushes both to ECR
 
-This ensures reproducibility and unambiguous image versioning.
+Step 3 — GitHub Actions (deploy)
+SSHs into EC2
 
----
+Executes /infra/scripts/deploy.sh
 
-# 14. Testing the System
+Refreshes containers with zero downtime
 
-### Check article list:
+Example workflow file: .github/workflows/deploy.yml
+yaml
+Copiar código
+# GitHub Actions - CI/CD Pipeline for MyWorlds Blog
+name: Deploy to EC2 via CodeBuild
 
-```bash
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Trigger CodeBuild
+        uses: aws-actions/aws-codebuild-run-build@v1
+        with:
+          project-name: ${{ secrets.CODEBUILD_PROJECT_NAME }}
+
+      - name: Wait for 25 seconds (ECR sync time)
+        run: sleep 25
+
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/blog-challenge/infra
+            docker-compose pull
+            docker-compose up -d
+            docker system prune -f
+14. Testing
+Check articles:
+bash
+Copiar código
 curl http://56.124.99.8/articles
-```
-
-### Check backend logs:
-
-```bash
+View backend logs:
+bash
+Copiar código
 docker logs -f blog-backend
-```
+Expected:
 
-Expected log:
-
-```
+css
+Copiar código
 Job de artigo (a cada 8 horas)...
 Artigo criado: <uuid>
+15. Possible Future Enhancements
+Admin login and dashboard
+
+SEO metadata and tags
+
+Pagination and search
+
+HTTPS via Nginx + Certbot
+
+Full CI/CD with GitHub Actions (no CodeBuild)
+
+CloudWatch logging
+
+Redis caching
+
+Automated migrations with Prisma or Knex
+
+Blue/Green deployments
+
+16. Challenge Requirement Checklist
+Requirement	Status
+React frontend	Completed
+Node.js backend	Completed
+AI-generated articles	Completed
+Automatic daily generation	Completed (8h schedule)
+Database storage	Completed
+Dockerized	Completed
+Deploy on EC2	Completed
+CodeBuild pipeline	Completed
+ECR registry	Completed
+GitHub Actions deployment	Completed
+At least 3 initial articles	Completed
+Public live URL	Completed
+
+17. Author
+Danilo de Morais
+Senior Software Engineer — Full-Stack, Cloud & DevOps
+Brazil
+Contact available upon request.
 ```
-
----
-
-# 15. Improvements with More Time
-
-- Admin portal with authentication
-- Tags, pagination, and search
-- SEO optimization for article metadata
-- Full CI/CD via GitHub Actions or CodePipeline
-- HTTPS via Nginx + Certbot or ALB
-- CloudWatch logging and dashboards
-- Test suite (Jest, integration tests)
-- Cleanup/automation scripts for EC2
-
----
-
-# 16. Challenge Requirement Checklist
-
-| Requirement                   | Status                  |
-| ----------------------------- | ----------------------- |
-| React frontend                | Completed               |
-| Node.js backend               | Completed               |
-| AI-generated articles         | Completed               |
-| Automatic daily generation    | Completed (8h interval) |
-| Database storage              | Completed               |
-| Dockerized                    | Completed               |
-| Deploy on EC2                 | Completed               |
-| CodeBuild pipeline            | Completed               |
-| ECR registry                  | Completed               |
-| At least 3 articles initially | Completed               |
-| Public live URL               | Completed               |
-
----
-
-# 17. Author
-
-**Danilo de Morais**  
-Senior Software Engineer — Full-Stack, Cloud, DevOps  
-Brazil  
-LinkedIn and contact available upon request.
