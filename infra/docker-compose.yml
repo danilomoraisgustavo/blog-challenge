@@ -27,8 +27,9 @@ services:
       PGDATABASE: ${PGDATABASE:-myworlds}
       PORT: 4000
       NODE_ENV: production
-      # Outras variáveis (IA etc):
-      # HF_API_KEY: ${HF_API_KEY}
+
+      HF_MODEL: ${HF_MODEL}
+      HF_API_KEY: ${HF_API_KEY}
     networks:
       - blog-net
     restart: unless-stopped
