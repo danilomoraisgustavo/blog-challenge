@@ -1,4 +1,43 @@
 version: 0.2
 
-imports:
-  - infra/buildspec.yml
+env:
+  variables:
+    AWS_REGION: sa-east-1
+    BACKEND_REPO_NAME: blog-backend
+    FRONTEND_REPO_NAME: blog-frontend
+
+phases:
+  pre_build:
+    commands:
+      - echo "===== PRE_BUILD: obtendo ACCOUNT_ID e fazendo login no ECR ====="
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - echo "ACCOUNT_ID=$ACCOUNT_ID"
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      - BACKEND_REPO_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$BACKEND_REPO_NAME
+      - FRONTEND_REPO_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$FRONTEND_REPO_NAME
+      - IMAGE_TAG=$(date +%Y%m%d%H%M%S)
+      - echo "BACKEND_REPO_URI=$BACKEND_REPO_URI"
+      - echo "FRONTEND_REPO_URI=$FRONTEND_REPO_URI"
+      - echo "IMAGE_TAG=$IMAGE_TAG"
+
+  build:
+    commands:
+      - echo "===== BUILD: backend ====="
+      - docker build -t $BACKEND_REPO_URI:$IMAGE_TAG -f backend/Dockerfile backend
+
+      - echo "===== BUILD: frontend ====="
+      - docker build -t $FRONTEND_REPO_URI:$IMAGE_TAG -f frontend/Dockerfile frontend
+
+  post_build:
+    commands:
+      - echo "===== POST_BUILD: push imagens ====="
+      - docker push $BACKEND_REPO_URI:$IMAGE_TAG
+      - docker push $FRONTEND_REPO_URI:$IMAGE_TAG
+
+      - echo "Gerando imageDetail.json..."
+      - printf '{"backend_image":"%s","frontend_image":"%s"}' "$BACKEND_REPO_URI:$IMAGE_TAG" "$FRONTEND_REPO_URI:$IMAGE_TAG" > imageDetail.json
+
+artifacts:
+  files:
+    - infra/docker-compose.yml
+    - imageDetail.json
