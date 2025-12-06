@@ -16,6 +16,21 @@ app.use(cors());
 app.use(express.json());
 
 // Cron – 1x por dia às 03:00
+cron.schedule("0 3 * * *", () => {
+    runDailyArticleJob().catch((err) => {
+        console.error("Erro ao rodar job diário (03:00):", err);
+    });
+});
+
+// Cron – a cada 8 horas
+cron.schedule("0 */8 * * *", () => {
+    console.log("⏱ Job de artigo (a cada 8 horas)...");
+    runDailyArticleJob().catch((err) => {
+        console.error("Erro no job de 8 horas:", err);
+    });
+});
+
+// Cron – TESTE: a cada 20 segundos
 cron.schedule("*/20 * * * * *", () => {
     console.log("⏱ TESTE: executando job a cada 20 segundos...");
     runDailyArticleJob().catch((err) => {
