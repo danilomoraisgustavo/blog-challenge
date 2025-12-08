@@ -43,7 +43,7 @@ async function callHuggingFaceTextGeneration(prompt) {
                 content: prompt,
             },
         ],
-        max_tokens: 2500,
+        max_tokens: 1800,
         temperature: 0.8,
         top_p: 0.9,
         stream: false,
